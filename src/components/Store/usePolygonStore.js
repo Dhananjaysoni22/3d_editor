@@ -1,4 +1,7 @@
 import { create } from "zustand";
+import concaveman from "concaveman";
+import * as THREE from "three";
+import simplify from "simplify-js";
 
 export const usePolygonStore = create((set, get) => ({
     points: [],
@@ -9,6 +12,9 @@ export const usePolygonStore = create((set, get) => ({
     isDraggingPolygon: false,
     isMesh: false,
     model: null,
+    modelBounds: null,
+
+    setModelBounds: (box) => set({ modelBounds: box }),
 
     setModel: (model) => set({ model }),
 
@@ -199,5 +205,108 @@ export const usePolygonStore = create((set, get) => ({
         }
 
         return inside;
-    }
+    },
+    generateSafeZoneFromModel: (model) => {
+        if (!model) return;
+
+        const rawPoints = [];
+        const v = new THREE.Vector3();
+
+        model.updateMatrixWorld(true);
+
+        // =========================================
+        // 🔥 STEP 1: SAMPLE VERTICES (CRITICAL)
+        // =========================================
+        const SAMPLE_STEP = 20;
+
+        model.traverse((child) => {
+            if (!child.isMesh) return;
+
+            const pos = child.geometry.attributes.position;
+
+            for (let i = 0; i < pos.count; i += SAMPLE_STEP) {
+                v.fromBufferAttribute(pos, i);
+                v.applyMatrix4(child.matrixWorld);
+
+                rawPoints.push([v.x, v.y]);
+            }
+        });
+
+        if (rawPoints.length === 0) return;
+
+        // =========================================
+        // 🔥 STEP 2: REMOVE NEAR DUPLICATES
+        // =========================================
+        const filtered = [];
+        const THRESHOLD = 0.2;
+
+        rawPoints.forEach((p) => {
+            const exists = filtered.some(
+                (fp) =>
+                    Math.abs(fp[0] - p[0]) < THRESHOLD &&
+                    Math.abs(fp[1] - p[1]) < THRESHOLD
+            );
+
+            if (!exists) filtered.push(p);
+        });
+
+        // =========================================
+        // 🔥 STEP 3: LIMIT MAX POINTS (SAFETY)
+        // =========================================
+        const MAX_POINTS = 2000;
+
+        const safePoints =
+            filtered.length > MAX_POINTS
+                ? filtered.slice(0, MAX_POINTS)
+                : filtered;
+
+        // =========================================
+        // 🔥 STEP 4: CONCAVE HULL
+        // =========================================
+        const concave = concaveman(safePoints, 3);
+
+        // =========================================
+        // 🔥 STEP 5: SIMPLIFY POLYGON
+        // =========================================
+        const simplified = simplify(
+            concave.map(([x, y]) => ({ x, y })),
+            0.5,
+            true
+        );
+
+        // =========================================
+        // 🔥 STEP 6: SAFE ZONE OFFSET
+        // =========================================
+        const SCALE = 1.05;
+
+        const polygon = simplified.map((p, i) => ({
+            id: i + 1,
+            x: p.x * SCALE,
+            y: p.y * SCALE,
+        }));
+
+        // =========================================
+        // 🔥 STEP 7: CREATE SEGMENTS
+        // =========================================
+        const segments = polygon.map((p, i) => {
+            const next = polygon[(i + 1) % polygon.length];
+
+            return {
+                id: `${p.id}-${next.id}`,
+                start: p.id,
+                end: next.id,
+                type: "line",
+            };
+        });
+
+        // =========================================
+        // 🔥 STEP 8: UPDATE STORE
+        // =========================================
+        set({
+            points: polygon,
+            segments,
+            closed: true,
+            selectedSegment: null,
+        });
+    },
 }));
