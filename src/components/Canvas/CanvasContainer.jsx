@@ -5,6 +5,7 @@ import InteractionManager from "./InteractionManager";
 import ControlPointsLayer from "./ControlPointsLayer";
 import { Grid } from "@react-three/drei";
 import PolygonMeshLayer from "./PolygonMeshLayer";
+import ModelLayer from "./ModelLayer";
 
 export default function CanvasContainer() {
   return (
@@ -24,6 +25,7 @@ export default function CanvasContainer() {
         cellColor="#000000"
       />{" "}
       <color attach="background" args={["#ffffff"]} />
+      <ModelLayer />
       <PointsLayer />
       <SegmentsLayer />
       <ControlPointsLayer />

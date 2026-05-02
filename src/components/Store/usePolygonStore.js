@@ -8,6 +8,9 @@ export const usePolygonStore = create((set, get) => ({
     selectedPolygon: false,
     isDraggingPolygon: false,
     isMesh: false,
+    model: null,
+
+    setModel: (model) => set({ model }),
 
     convertToMesh: () => set({ isMesh: true }),
     selectPolygon: () => set({ selectedPolygon: true }),

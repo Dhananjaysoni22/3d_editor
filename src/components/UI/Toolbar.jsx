@@ -2,6 +2,8 @@ import React from "react";
 import { usePolygonStore } from "../Store/usePolygonStore";
 import * as THREE from "three";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+
 function Toolbar() {
   const {
     clearPolygon,
@@ -10,6 +12,7 @@ function Toolbar() {
     closed,
     points,
     segments,
+    setModel,
   } = usePolygonStore();
 
   const exportGLB = (segments, points) => {
@@ -94,6 +97,22 @@ function Toolbar() {
     );
   };
 
+  const handleUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+
+    const loader = new GLTFLoader();
+    loader.load(url, (gltf) => {
+      const model = gltf.scene;
+
+      // 🔥 normalize model (important)
+      model.position.set(0, 0, 0);
+
+      setModel(model);
+    });
+  };
   //   if (!selectedPolygon || !closed) return null;
 
   return (
@@ -107,6 +126,7 @@ function Toolbar() {
       <button style={styles.button} onClick={() => exportGLB(segments, points)}>
         Export GLB
       </button>
+      <input type="file" accept=".glb,.gltf" onChange={handleUpload} />
     </div>
   );
 }
