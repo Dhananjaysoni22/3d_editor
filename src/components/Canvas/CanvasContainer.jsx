@@ -4,6 +4,7 @@ import SegmentsLayer from "./SegmentsLayer";
 import InteractionManager from "./InteractionManager";
 import ControlPointsLayer from "./ControlPointsLayer";
 import { Grid } from "@react-three/drei";
+import PolygonMeshLayer from "./PolygonMeshLayer";
 
 export default function CanvasContainer() {
   return (
@@ -12,6 +13,8 @@ export default function CanvasContainer() {
       orthographic
       camera={{ zoom: 50, position: [0, 0, 10] }}
     >
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[10, 10, 10]} intensity={1} />
       <Grid
         rotation={[Math.PI / 2, 0, 0]}
         infiniteGrid
@@ -24,6 +27,7 @@ export default function CanvasContainer() {
       <PointsLayer />
       <SegmentsLayer />
       <ControlPointsLayer />
+      <PolygonMeshLayer />
       <InteractionManager />
     </Canvas>
   );

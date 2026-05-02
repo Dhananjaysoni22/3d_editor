@@ -7,7 +7,9 @@ export const usePolygonStore = create((set, get) => ({
     selectedSegment: null,
     selectedPolygon: false,
     isDraggingPolygon: false,
+    isMesh: false,
 
+    convertToMesh: () => set({ isMesh: true }),
     selectPolygon: () => set({ selectedPolygon: true }),
     deselectPolygon: () => set({ selectedPolygon: false }),
 
@@ -19,7 +21,9 @@ export const usePolygonStore = create((set, get) => ({
             points: [],
             segments: [],
             closed: false,
-            selectedSegment: false
+            selectedSegment: false,
+            selectedPolygon: false,
+            isMesh: false,
         }),
 
     // 🔹 Add Point + Auto Create Segment
