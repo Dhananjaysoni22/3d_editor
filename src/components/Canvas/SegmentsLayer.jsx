@@ -3,8 +3,13 @@ import { usePolygonStore } from "../Store/usePolygonStore";
 import { useMemo } from "react";
 
 export default function SegmentsLayer() {
-  const { segments, points, convertToCurve, setSelectedSegment } =
-    usePolygonStore();
+  const {
+    segments,
+    points,
+    convertToCurve,
+    setSelectedSegment,
+    selectedPolygon,
+  } = usePolygonStore();
 
   const getPoint = (id) => points.find((p) => p.id === id);
 
@@ -39,7 +44,9 @@ export default function SegmentsLayer() {
                     itemSize={3}
                   />
                 </bufferGeometry>
-                <lineBasicMaterial color="white" />
+                <lineBasicMaterial
+                  color={selectedPolygon ? "yellow" : "white"}
+                />
               </line>
 
               {/* midpoint button */}
@@ -92,7 +99,9 @@ export default function SegmentsLayer() {
                   itemSize={3}
                 />
               </bufferGeometry>
-              <lineBasicMaterial color="orange" />
+              <lineBasicMaterial
+                color={selectedPolygon ? "yellow" : "orange"}
+              />
             </line>
           );
         }

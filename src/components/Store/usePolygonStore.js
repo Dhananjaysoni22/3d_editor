@@ -5,6 +5,22 @@ export const usePolygonStore = create((set, get) => ({
     segments: [],
     closed: false,
     selectedSegment: null,
+    selectedPolygon: false,
+    isDraggingPolygon: false,
+
+    selectPolygon: () => set({ selectedPolygon: true }),
+    deselectPolygon: () => set({ selectedPolygon: false }),
+
+    startPolygonDrag: () => set({ isDraggingPolygon: true }),
+    stopPolygonDrag: () => set({ isDraggingPolygon: false }),
+
+    clearPolygon: () =>
+        set({
+            points: [],
+            segments: [],
+            closed: false,
+            selectedSegment: false
+        }),
 
     // 🔹 Add Point + Auto Create Segment
     addPoint: (point) => {
@@ -135,4 +151,46 @@ export const usePolygonStore = create((set, get) => ({
             )
         })),
     setSelectedSegment: (id) => set({ selectedSegment: id }),
+    movePolygon: (dx, dy) =>
+        set((state) => ({
+            points: state.points.map((p) => ({
+                ...p,
+                x: p.x + dx,
+                y: p.y + dy,
+            })),
+
+            segments: state.segments.map((seg) => {
+                if (seg.type !== "bezier") return seg;
+
+                return {
+                    ...seg,
+                    control1: {
+                        x: seg.control1.x + dx,
+                        y: seg.control1.y + dy,
+                    },
+                    control2: {
+                        x: seg.control2.x + dx,
+                        y: seg.control2.y + dy,
+                    },
+                };
+            }),
+        })),
+    isPointInsidePolygon: (x, y) => {
+        const { points } = get();
+
+        let inside = false;
+
+        for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+            const xi = points[i].x, yi = points[i].y;
+            const xj = points[j].x, yj = points[j].y;
+
+            const intersect =
+                yi > y !== yj > y &&
+                x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+
+            if (intersect) inside = !inside;
+        }
+
+        return inside;
+    }
 }));

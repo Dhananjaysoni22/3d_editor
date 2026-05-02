@@ -18,9 +18,9 @@ export default function CanvasContainer() {
         cellSize={1}
         sectionSize={3}
         fadeDistance={50}
-        cellColor="#ffffff"
+        cellColor="#000000"
       />{" "}
-      <color attach="background" args={["#111"]} />
+      <color attach="background" args={["#ffffff"]} />
       <PointsLayer />
       <SegmentsLayer />
       <ControlPointsLayer />
