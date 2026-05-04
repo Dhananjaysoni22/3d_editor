@@ -1,93 +1,82 @@
 import { Line, Text } from "@react-three/drei";
 import { usePolygonStore } from "../Store/usePolygonStore";
 import * as THREE from "three";
-import { useThree } from "@react-three/fiber";
+import { useMemo } from "react";
+
+function getClosestFromCache(worldPoint, cachedVertices) {
+  let minDist = Infinity;
+  let closestPoint = null;
+  const fx = worldPoint.x,
+    fy = worldPoint.y;
+
+  for (let j = 0; j < cachedVertices.length; j++) {
+    const [vx, vy] = cachedVertices[j];
+    const dx = fx - vx,
+      dy = fy - vy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < minDist) {
+      minDist = dist;
+      closestPoint = new THREE.Vector3(vx, vy, 0);
+    }
+  }
+  return { closestPoint, distance: minDist };
+}
 
 export default function DistanceLayer() {
-  const { points, closed, model } = usePolygonStore();
-  const { camera, size } = useThree();
-  model?.traverse((child) => {
-    if (child.isMesh) {
-      console.log("✅ Mesh found:", child);
-    }
-  });
-  if (!closed || !model || points.length === 0) return null;
+  const { points, closed, cachedVertices, measurementPointIds } =
+    usePolygonStore();
 
-  const samplePoints = [
-    points[0],
-    points[Math.floor(points.length / 2)],
-    points[points.length - 1],
-  ].filter(Boolean);
+  const measurements = useMemo(() => {
+    if (!closed || !cachedVertices?.length || !measurementPointIds?.length)
+      return [];
+
+    return points
+      .filter((p) => measurementPointIds.includes(p.id))
+      .map((p) => {
+        const polygonPoint = new THREE.Vector3(p.x, p.y, 0);
+        const { closestPoint, distance } = getClosestFromCache(
+          polygonPoint,
+          cachedVertices,
+        );
+        if (!closestPoint) return null;
+
+        const mm = Math.round(distance * 1000);
+        const mid = new THREE.Vector3()
+          .addVectors(polygonPoint, closestPoint)
+          .multiplyScalar(0.5);
+
+        return { polygonPoint, closestPoint, mm, mid };
+      })
+      .filter(Boolean);
+  }, [points, closed, cachedVertices, measurementPointIds]);
+
+  if (measurements.length === 0) return null;
 
   return (
     <>
-      {samplePoints.map((p, i) => {
-        const raycaster = new THREE.Raycaster();
-
-        // ✅ convert world → screen
-        const vector = new THREE.Vector3(p.x, p.y, 0).project(camera);
-
-        const mouse = {
-          x: vector.x,
-          y: vector.y,
-        };
-
-        raycaster.setFromCamera(mouse, camera);
-
-        let hits = [];
-
-        model.updateWorldMatrix(true, true);
-
-        model.traverse((child) => {
-          if (child.isMesh) {
-            const result = raycaster.intersectObject(child, false);
-            if (result.length > 0) hits.push(...result);
-          }
-        });
-
-        if (hits.length === 0) {
-          console.log("❌ no hit for point", p);
-          return null;
-        }
-
-        hits.sort((a, b) => a.distance - b.distance);
-
-        const hit = hits[0].point;
-
-        console.log("✅ HIT:", hit);
-
-        const distance = Math.sqrt((p.x - hit.x) ** 2 + (p.y - hit.y) ** 2);
-
-        const mm = distance * 1000;
-
-        const midX = (p.x + hit.x) / 2;
-        const midY = (p.y + hit.y) / 2;
-
-        return (
-          <group key={i}>
-            {/* 🔴 LINE */}
-            <Line
-              points={[
-                [p.x, p.y, 2],
-                [hit.x, hit.y, 2],
-              ]}
-              color="red"
-              lineWidth={3}
-              depthTest={false}
-            />
-
-            {/* 🔴 TEXT */}
-            <Text
-              position={[midX, midY, 3]}
-              fontSize={0.4}
-              color="red"
-              depthTest={false}
-            >
-              {mm.toFixed(0)} mm
-            </Text>
-          </group>
-        );
-      })}
+      {measurements.map((m, i) => (
+        <group key={i}>
+          <Line
+            points={[
+              [m.polygonPoint.x, m.polygonPoint.y, 0.1],
+              [m.closestPoint.x, m.closestPoint.y, 0.1],
+            ]}
+            color="red"
+            lineWidth={2}
+            depthTest={false}
+          />
+          <Text
+            position={[m.mid.x, m.mid.y, 0.2]}
+            fontSize={0.3}
+            color="red"
+            depthTest={false}
+            anchorX="center"
+            anchorY="middle"
+          >
+            {m.mm} mm
+          </Text>
+        </group>
+      ))}
     </>
   );
 }

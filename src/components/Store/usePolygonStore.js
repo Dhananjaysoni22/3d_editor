@@ -13,6 +13,7 @@ export const usePolygonStore = create((set, get) => ({
     isMesh: false,
     model: null,
     modelBounds: null,
+    measurementPointIds: [],
 
     setModelBounds: (box) => set({ modelBounds: box }),
 
@@ -215,19 +216,20 @@ export const usePolygonStore = create((set, get) => ({
         model.updateMatrixWorld(true);
 
         // =========================================
-        // 🔥 STEP 1: SAMPLE VERTICES (CRITICAL)
+        // STEP 1: SAMPLE VERTICES
+        // ↓ Was 20 — too sparse, missing geometry
         // =========================================
-        const SAMPLE_STEP = 20;
+        const SAMPLE_STEP = 3;
 
         model.traverse((child) => {
-            if (!child.isMesh) return;
+            if (!child.isMesh || !child.geometry?.attributes?.position) return;
 
+            child.updateMatrixWorld(true);
             const pos = child.geometry.attributes.position;
 
             for (let i = 0; i < pos.count; i += SAMPLE_STEP) {
                 v.fromBufferAttribute(pos, i);
                 v.applyMatrix4(child.matrixWorld);
-
                 rawPoints.push([v.x, v.y]);
             }
         });
@@ -235,62 +237,79 @@ export const usePolygonStore = create((set, get) => ({
         if (rawPoints.length === 0) return;
 
         // =========================================
-        // 🔥 STEP 2: REMOVE NEAR DUPLICATES
+        // STEP 2: GRID-BASED DEDUP
+        // ↓ Was O(n²) linear scan — slow and inconsistent
         // =========================================
-        const filtered = [];
-        const THRESHOLD = 0.2;
+        const CELL_SIZE = 0.15;
+        const gridMap = new Map();
 
-        rawPoints.forEach((p) => {
-            const exists = filtered.some(
-                (fp) =>
-                    Math.abs(fp[0] - p[0]) < THRESHOLD &&
-                    Math.abs(fp[1] - p[1]) < THRESHOLD
-            );
-
-            if (!exists) filtered.push(p);
+        rawPoints.forEach(([x, y]) => {
+            const key = `${Math.floor(x / CELL_SIZE)},${Math.floor(y / CELL_SIZE)}`;
+            if (!gridMap.has(key)) gridMap.set(key, [x, y]);
         });
 
-        // =========================================
-        // 🔥 STEP 3: LIMIT MAX POINTS (SAFETY)
-        // =========================================
-        const MAX_POINTS = 2000;
-
-        const safePoints =
-            filtered.length > MAX_POINTS
-                ? filtered.slice(0, MAX_POINTS)
-                : filtered;
+        const filtered = Array.from(gridMap.values());
 
         // =========================================
-        // 🔥 STEP 4: CONCAVE HULL
+        // STEP 3: SAFETY CAP — preserve spread
         // =========================================
-        const concave = concaveman(safePoints, 3);
+        const MAX_POINTS = 4000;
+        const safePoints = filtered.length > MAX_POINTS
+            ? filtered.filter((_, i) => i % Math.ceil(filtered.length / MAX_POINTS) === 0)
+            : filtered;
 
         // =========================================
-        // 🔥 STEP 5: SIMPLIFY POLYGON
+        // STEP 4: TIGHTER CONCAVE HULL
+        // ↓ Was 3 — too loose, missing arms/ladder
+        // =========================================
+        const concave = concaveman(safePoints, 1.8);
+
+        // =========================================
+        // STEP 5: GENTLER SIMPLIFICATION
+        // ↓ Was 0.5 — too aggressive, losing shape detail
         // =========================================
         const simplified = simplify(
             concave.map(([x, y]) => ({ x, y })),
-            0.5,
+            0.2,
             true
         );
 
         // =========================================
-        // 🔥 STEP 6: SAFE ZONE OFFSET
+        // STEP 6: TRUE OUTWARD OFFSET via edge normals
+        // ↓ Was scale * 1.05 — distorts non-centered shapes
         // =========================================
-        const SCALE = 1.05;
+        const OFFSET = 1.5;
+        const n = simplified.length;
 
-        const polygon = simplified.map((p, i) => ({
-            id: i + 1,
-            x: p.x * SCALE,
-            y: p.y * SCALE,
-        }));
+        const polygon = simplified.map((p, i) => {
+            const prev = simplified[(i - 1 + n) % n];
+            const next = simplified[(i + 1) % n];
+
+            const ax = p.x - prev.x, ay = p.y - prev.y;
+            const bx = next.x - p.x, by = next.y - p.y;
+
+            const na = { x: -ay, y: ax };
+            const nb = { x: -by, y: bx };
+
+            const lenA = Math.hypot(na.x, na.y) || 1;
+            const lenB = Math.hypot(nb.x, nb.y) || 1;
+
+            const nx = (na.x / lenA + nb.x / lenB);
+            const ny = (na.y / lenA + nb.y / lenB);
+            const len = Math.hypot(nx, ny) || 1;
+
+            return {
+                id: i + 1,
+                x: p.x + (nx / len) * OFFSET,
+                y: p.y + (ny / len) * OFFSET,
+            };
+        });
 
         // =========================================
-        // 🔥 STEP 7: CREATE SEGMENTS
+        // STEP 7: SEGMENTS
         // =========================================
         const segments = polygon.map((p, i) => {
             const next = polygon[(i + 1) % polygon.length];
-
             return {
                 id: `${p.id}-${next.id}`,
                 start: p.id,
@@ -298,15 +317,36 @@ export const usePolygonStore = create((set, get) => ({
                 type: "line",
             };
         });
+        const allIds = polygon.map((p) => p.id);
 
-        // =========================================
-        // 🔥 STEP 8: UPDATE STORE
-        // =========================================
-        set({
-            points: polygon,
-            segments,
-            closed: true,
-            selectedSegment: null,
-        });
+        set({ points: polygon, segments, closed: true, selectedSegment: null, });
     },
+    // In your store, add this helper to cache vertices
+    cacheModelVertices: (model) => {
+        if (!model) return;
+        model.updateMatrixWorld(true);
+
+        const v = new THREE.Vector3();
+        const vertices = [];
+
+        model.traverse((child) => {
+            if (!child.isMesh || !child.geometry?.attributes?.position) return;
+            child.updateMatrixWorld(true);
+            const pos = child.geometry.attributes.position;
+
+            // Sample every 5th vertex — enough for accurate distance
+            for (let i = 0; i < pos.count; i += 5) {
+                v.fromBufferAttribute(pos, i);
+                v.applyMatrix4(child.matrixWorld);
+                vertices.push([v.x, v.y]); // store flat XY
+            }
+        });
+
+        set({ cachedVertices: vertices });
+    },
+    toggleMeasurementPoint: (id) => set((state) => ({
+        measurementPointIds: state.measurementPointIds.includes(id)
+            ? state.measurementPointIds.filter((pid) => pid !== id)
+            : [...state.measurementPointIds, id],
+    })),
 }));

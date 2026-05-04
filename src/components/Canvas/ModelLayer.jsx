@@ -3,32 +3,35 @@ import { usePolygonStore } from "../Store/usePolygonStore";
 import * as THREE from "three";
 
 export default function ModelLayer() {
-  const { model, setModelBounds } = usePolygonStore();
+  const { model, setModelBounds, cacheModelVertices } = usePolygonStore();
 
   useEffect(() => {
     if (!model) return;
 
-    model.updateWorldMatrix(true, true);
+    model.position.set(0, 0, 0);
+    model.rotation.set(0, 0, 0);
+    model.scale.set(1, 1, 1);
+    model.updateMatrixWorld(true);
+
+    model.rotation.x = -Math.PI / 2;
+    model.updateMatrixWorld(true);
 
     const box = new THREE.Box3().setFromObject(model);
     const center = new THREE.Vector3();
     box.getCenter(center);
 
-    // ✅ CENTER MODEL
-    model.position.sub(center);
+    model.position.set(-center.x, -center.y, -center.z);
+    model.updateMatrixWorld(true);
 
-    // ✅ APPLY ROTATION FIRST
-    model.rotation.x = -Math.PI / 2;
-
-    // ✅ UPDATE AGAIN AFTER ROTATION
-    model.updateWorldMatrix(true, true);
-
-    const newBox = new THREE.Box3().setFromObject(model);
-
+    const finalBox = new THREE.Box3().setFromObject(model);
     setModelBounds({
-      min: newBox.min.clone(),
-      max: newBox.max.clone(),
+      min: finalBox.min.clone(),
+      max: finalBox.max.clone(),
     });
+
+    // ✅ Safe zone generated AFTER model is in final position
+    // Remove this line if you want manual trigger only
+    cacheModelVertices(model);
   }, [model]);
   // model?.traverse((child) => {
   //   if (child.isMesh) {

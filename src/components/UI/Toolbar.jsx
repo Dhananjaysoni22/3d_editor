@@ -3,6 +3,7 @@ import { usePolygonStore } from "../Store/usePolygonStore";
 import * as THREE from "three";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 
 function Toolbar() {
   const {
@@ -114,11 +115,30 @@ function Toolbar() {
     const url = URL.createObjectURL(file);
 
     const loader = new GLTFLoader();
+
+    // ✅ ADD DRACO SUPPORT
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
+
+    loader.setDRACOLoader(dracoLoader);
+
     loader.load(url, (gltf) => {
       const model = gltf.scene;
 
-      // 🔥 normalize model (important)
+      // 🔥 normalize model
       model.position.set(0, 0, 0);
+      model.rotation.set(0, 0, 0);
+      model.scale.set(1, 1, 1);
+
+      // optional safety fixes (important for your raycasting work)
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.material.side = THREE.DoubleSide;
+          child.raycast = THREE.Mesh.prototype.raycast;
+          child.geometry.computeBoundingBox();
+          child.geometry.computeBoundingSphere();
+        }
+      });
 
       setModel(model);
     });
