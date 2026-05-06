@@ -14,6 +14,7 @@ export const usePolygonStore = create((set, get) => ({
     model: null,
     modelBounds: null,
     measurementPointIds: [],
+    editCurve: false,
 
     setModelBounds: (box) => set({ modelBounds: box }),
 
@@ -25,6 +26,10 @@ export const usePolygonStore = create((set, get) => ({
 
     startPolygonDrag: () => set({ isDraggingPolygon: true }),
     stopPolygonDrag: () => set({ isDraggingPolygon: false }),
+
+    toggleEditCurve: () => set((state) => (({
+        editCurve: !state.editCurve
+    }))),
 
     clearPolygon: () =>
         set({
@@ -219,7 +224,7 @@ export const usePolygonStore = create((set, get) => ({
         // STEP 1: SAMPLE VERTICES
         // ↓ Was 20 — too sparse, missing geometry
         // =========================================
-        const SAMPLE_STEP = 3;
+        const SAMPLE_STEP = 5;
 
         model.traverse((child) => {
             if (!child.isMesh || !child.geometry?.attributes?.position) return;
@@ -240,7 +245,7 @@ export const usePolygonStore = create((set, get) => ({
         // STEP 2: GRID-BASED DEDUP
         // ↓ Was O(n²) linear scan — slow and inconsistent
         // =========================================
-        const CELL_SIZE = 0.15;
+        const CELL_SIZE = 0.5;
         const gridMap = new Map();
 
         rawPoints.forEach(([x, y]) => {
@@ -248,7 +253,23 @@ export const usePolygonStore = create((set, get) => ({
             if (!gridMap.has(key)) gridMap.set(key, [x, y]);
         });
 
-        const filtered = Array.from(gridMap.values());
+        // const filtered = Array.from(gridMap.values());
+        // STEP 2.5: REMOVE ISOLATED POINTS (internal geometry noise)
+        const deduped = Array.from(gridMap.values());
+        const NEIGHBOUR_RADIUS = 0.8;
+        const MIN_NEIGHBOURS = 2;
+
+        const filtered = deduped.filter(([x, y]) => {
+            let count = 0;
+            for (let j = 0; j < deduped.length; j++) {
+                const dx = x - deduped[j][0];
+                const dy = y - deduped[j][1];
+                if (Math.sqrt(dx * dx + dy * dy) < NEIGHBOUR_RADIUS) {
+                    if (++count >= MIN_NEIGHBOURS) return true;
+                }
+            }
+            return false;
+        });
 
         // =========================================
         // STEP 3: SAFETY CAP — preserve spread
@@ -262,7 +283,38 @@ export const usePolygonStore = create((set, get) => ({
         // STEP 4: TIGHTER CONCAVE HULL
         // ↓ Was 3 — too loose, missing arms/ladder
         // =========================================
-        const concave = concaveman(safePoints, 1.8);
+        const concave = concaveman(safePoints, 2);
+        // =========================================
+        // STEP 4.5: MERGE CLOSE HULL POINTS ✅ NEW
+        // Collapses clustered hull points into midpoints
+        // without loosening the overall shape
+        // =========================================
+        const MERGE_DISTANCE = 0.8;
+        const mergedConcave = [];
+
+        for (let i = 0; i < concave.length; i++) {
+            const curr = concave[i];
+            const prev = mergedConcave[mergedConcave.length - 1];
+
+            if (!prev) {
+                mergedConcave.push(curr);
+                continue;
+            }
+
+            const dx = curr[0] - prev[0];
+            const dy = curr[1] - prev[1];
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < MERGE_DISTANCE) {
+                // Replace last point with midpoint
+                mergedConcave[mergedConcave.length - 1] = [
+                    (curr[0] + prev[0]) / 2,
+                    (curr[1] + prev[1]) / 2,
+                ];
+            } else {
+                mergedConcave.push(curr);
+            }
+        }
 
         // =========================================
         // STEP 5: GENTLER SIMPLIFICATION
@@ -270,7 +322,7 @@ export const usePolygonStore = create((set, get) => ({
         // =========================================
         const simplified = simplify(
             concave.map(([x, y]) => ({ x, y })),
-            0.2,
+            0.3,
             true
         );
 

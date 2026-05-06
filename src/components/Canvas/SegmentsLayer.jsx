@@ -9,6 +9,7 @@ export default function SegmentsLayer() {
     convertToCurve,
     setSelectedSegment,
     selectedPolygon,
+    editCurve,
   } = usePolygonStore();
 
   const getPoint = (id) => points.find((p) => p.id === id);
@@ -50,17 +51,19 @@ export default function SegmentsLayer() {
               </line>
 
               {/* midpoint button */}
-              <mesh
-                position={[midX, midY, 0]}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  convertToCurve(seg.id);
-                  setSelectedSegment(seg.id);
-                }}
-              >
-                <circleGeometry args={[0.25, 16]} />
-                <meshBasicMaterial color="orange" />
-              </mesh>
+              {editCurve && (
+                <mesh
+                  position={[midX, midY, 0]}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    convertToCurve(seg.id);
+                    setSelectedSegment(seg.id);
+                  }}
+                >
+                  <circleGeometry args={[0.25, 16]} />
+                  <meshBasicMaterial color="orange" />
+                </mesh>
+              )}
             </group>
           );
         }

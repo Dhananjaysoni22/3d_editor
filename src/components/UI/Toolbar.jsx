@@ -16,6 +16,7 @@ function Toolbar() {
     setModel,
     model,
     generateSafeZoneFromModel,
+    toggleEditCurve,
   } = usePolygonStore();
 
   const exportGLB = () => {
@@ -162,6 +163,9 @@ function Toolbar() {
         onClick={() => generateSafeZoneFromModel(model)}
       >
         Auto Safezone
+      </button>
+      <button style={styles.button} onClick={() => toggleEditCurve()}>
+        Edit Curve
       </button>
     </div>
   );
