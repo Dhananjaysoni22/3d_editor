@@ -1,6 +1,6 @@
 import ClipperLib from "clipper-lib";
 
-function chaikinSmooth(points, iterations = 3) {
+function chaikinSmooth(points, iterations = 1) {
     let pts = [...points];
 
     for (let k = 0; k < iterations; k++) {
@@ -29,31 +29,26 @@ function chaikinSmooth(points, iterations = 3) {
     return pts;
 }
 
-function resamplePoints(points, spacing = 0.15) {
-    const result = [];
+function simplifyPolygon(points, minDistance = 0.25) {
+    if (!points.length) return [];
 
-    for (let i = 0; i < points.length; i++) {
-        const p1 = points[i];
-        const p2 = points[(i + 1) % points.length];
+    const simplified = [points[0]];
 
-        const dx = p2.x - p1.x;
-        const dy = p2.y - p1.y;
+    for (let i = 1; i < points.length; i++) {
+        const prev = simplified[simplified.length - 1];
+        const curr = points[i];
+
+        const dx = curr.x - prev.x;
+        const dy = curr.y - prev.y;
 
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        const segments = Math.max(1, Math.floor(dist / spacing));
-
-        for (let j = 0; j < segments; j++) {
-            const t = j / segments;
-
-            result.push({
-                x: p1.x + dx * t,
-                y: p1.y + dy * t,
-            });
+        if (dist >= minDistance) {
+            simplified.push(curr);
         }
     }
 
-    return result;
+    return simplified;
 }
 
 export function generateOffsetPolygon(
@@ -67,20 +62,12 @@ export function generateOffsetPolygon(
         };
     }
 
-    // -----------------------------------
-    // SCALE FOR CLIPPER
-    // -----------------------------------
-
     const SCALE = 1000;
 
     const clipperPath = points.map((p) => ({
         X: Math.round(p.x * SCALE),
         Y: Math.round(p.y * SCALE),
     }));
-
-    // -----------------------------------
-    // OFFSET
-    // -----------------------------------
 
     const co = new ClipperLib.ClipperOffset();
 
@@ -101,42 +88,29 @@ export function generateOffsetPolygon(
         };
     }
 
-    // -----------------------------------
-    // CONVERT BACK
-    // -----------------------------------
-
     let offsetPoints = solution[0].map((p, index) => ({
         id: index + 1,
         x: p.X / SCALE,
         y: p.Y / SCALE,
     }));
 
-    // -----------------------------------
-    // SMOOTH
-    // -----------------------------------
+    // SMOOTH LIGHTLY
+    offsetPoints = chaikinSmooth(offsetPoints, 1);
 
-    offsetPoints = chaikinSmooth(offsetPoints, 3);
+    // REMOVE EXTRA POINTS
+    offsetPoints = simplifyPolygon(
+        offsetPoints,
+        0.35,
+    );
 
-    // -----------------------------------
-    // RESAMPLE
-    // -----------------------------------
-
-    offsetPoints = resamplePoints(offsetPoints, 0.12);
-
-    // -----------------------------------
     // REBUILD IDS
-    // -----------------------------------
-
     offsetPoints = offsetPoints.map((p, i) => ({
         id: i + 1,
         x: p.x,
         y: p.y,
     }));
 
-    // -----------------------------------
     // SEGMENTS
-    // -----------------------------------
-
     const segments = offsetPoints.map((p, index) => {
         const next =
             offsetPoints[
