@@ -1,4 +1,7 @@
 import { create } from "zustand";
+import concaveman from "concaveman";
+import * as THREE from "three";
+import simplify from "simplify-js";
 
 export const usePolygonStore = create((set, get) => ({
     points: [],
@@ -8,6 +11,32 @@ export const usePolygonStore = create((set, get) => ({
     selectedPolygon: false,
     isDraggingPolygon: false,
     isMesh: false,
+    model: null,
+    modelBounds: null,
+    measurementPointIds: [],
+    editCurve: false,
+    footprintPoints: [],      // main product boundary (no offset)
+    footprintSegments: [],    // main boundary segments
+    safeZonePoints: [],       // 1500mm offset zone
+    safeZoneSegments: [],     // offset segments
+    showSafeZone: false,      // toggle
+    outlinePoints: [],
+
+    updateSafeZonePoint: (id, newPos) =>
+        set((state) => ({
+            safeZonePoints: state.safeZonePoints.map((p) =>
+                p.id === id
+                    ? { ...p, ...newPos }
+                    : p
+            ),
+        })),
+
+    setOutlinePoints: (points) =>
+        set({ outlinePoints: points }),
+
+    setModelBounds: (box) => set({ modelBounds: box }),
+
+    setModel: (model) => set({ model }),
 
     convertToMesh: () => set({ isMesh: true }),
     selectPolygon: () => set({ selectedPolygon: true }),
@@ -15,6 +44,10 @@ export const usePolygonStore = create((set, get) => ({
 
     startPolygonDrag: () => set({ isDraggingPolygon: true }),
     stopPolygonDrag: () => set({ isDraggingPolygon: false }),
+
+    toggleEditCurve: () => set((state) => (({
+        editCurve: !state.editCurve
+    }))),
 
     clearPolygon: () =>
         set({
@@ -196,5 +229,35 @@ export const usePolygonStore = create((set, get) => ({
         }
 
         return inside;
-    }
+    },
+
+    // In your store, add this helper to cache vertices
+    cacheModelVertices: (model) => {
+        if (!model) return;
+        model.updateMatrixWorld(true);
+
+        const v = new THREE.Vector3();
+        const vertices = [];
+
+        model.traverse((child) => {
+            if (!child.isMesh || !child.geometry?.attributes?.position) return;
+            child.updateMatrixWorld(true);
+            const pos = child.geometry.attributes.position;
+
+            // Sample every 5th vertex — enough for accurate distance
+            for (let i = 0; i < pos.count; i += 5) {
+                v.fromBufferAttribute(pos, i);
+                v.applyMatrix4(child.matrixWorld);
+                vertices.push([v.x, v.z]); // store flat XY
+            }
+        });
+
+        set({ cachedVertices: vertices });
+    },
+    toggleMeasurementPoint: (id) => set((state) => ({
+        measurementPointIds: state.measurementPointIds.includes(id)
+            ? state.measurementPointIds.filter((pid) => pid !== id)
+            : [...state.measurementPointIds, id],
+    })),
+
 }));

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 export default function PolygonMeshLayer() {
   const { segments, points, isMesh } = usePolygonStore();
+  const depth = 0.05;
 
   const geometry = useMemo(() => {
     if (!isMesh || segments.length === 0) return null;
@@ -56,7 +57,7 @@ export default function PolygonMeshLayer() {
 
     // 🔥 EXTRUDE (DEPTH)
     const geometry = new THREE.ExtrudeGeometry(shape, {
-      depth: 1,
+      depth: depth,
       bevelEnabled: false,
     });
 
@@ -68,7 +69,7 @@ export default function PolygonMeshLayer() {
   if (!geometry) return null;
 
   return (
-    <mesh geometry={geometry}>
+    <mesh position={[0, 0, -depth]} geometry={geometry}>
       <meshStandardMaterial color="green" />
     </mesh>
   );

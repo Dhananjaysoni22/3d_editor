@@ -2,39 +2,114 @@ import { useEffect, useState } from "react";
 import { usePolygonStore } from "../Store/usePolygonStore";
 
 export default function PointsLayer() {
-  const { points, updatePoint, setSelectedSegment } = usePolygonStore();
+  const {
+    safeZonePoints,
+    updateSafeZonePoint,
+    setSelectedSegment,
+    measurementPointIds,
+    toggleMeasurementPoint,
+  } = usePolygonStore();
+
+  const points = safeZonePoints;
+
   const [draggingId, setDraggingId] = useState(null);
+
+  const [dragMoved, setDragMoved] = useState(false);
+
   useEffect(() => {
-    const handleUp = () => setDraggingId(null);
+    const handleUp = () => {
+      setDraggingId(null);
+
+      setDragMoved(false);
+    };
+
     window.addEventListener("pointerup", handleUp);
-    return () => window.removeEventListener("pointerup", handleUp);
+
+    return () => {
+      window.removeEventListener("pointerup", handleUp);
+    };
   }, []);
+
   return (
     <>
-      {points.map((p, i) => (
-        <mesh
-          key={p.id}
-          position={[p.x, p.y, 0]}
-          onPointerDown={(e) => {
-            e.stopPropagation();
-            setDraggingId(p.id);
-            setSelectedSegment(null);
-          }}
-          onPointerUp={() => setDraggingId(null)}
-          onPointerMove={(e) => {
-            if (draggingId === p.id) {
-              e.stopPropagation();
-              updatePoint(p.id, {
-                x: e.point.x,
-                y: e.point.y,
-              });
-            }
-          }}
-        >
-          <circleGeometry args={[0.2, 16]} />
-          <meshBasicMaterial color={i === 0 ? "red" : "green"} />{" "}
-        </mesh>
-      ))}
+      {points
+        .filter((_, i) => i % 2 === 0)
+        .map((p, i) => {
+          const isMeasuring = measurementPointIds?.includes(p.id);
+
+          return (
+            <group key={p.id}>
+              {/* Ring */}
+              {isMeasuring && (
+                <mesh
+                  position={[p.x, 0.25, p.y]}
+                  rotation={[-Math.PI / 2, 0, 0]}
+                  renderOrder={999}
+                >
+                  <ringGeometry args={[0.16, 0.22, 20]} />
+                  <meshBasicMaterial
+                    color="red"
+                    depthTest={false}
+                    depthWrite={false}
+                    polygonOffset
+                    polygonOffsetFactor={-10}
+                    polygonOffsetUnits={-10}
+                  />
+                </mesh>
+              )}
+
+              {/* Point */}
+              <mesh
+                position={[p.x, 0.3, p.y]}
+                rotation={[-Math.PI / 2, 0, 0]}
+                renderOrder={999}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+
+                  setDraggingId(p.id);
+
+                  setDragMoved(false);
+
+                  setSelectedSegment(null);
+                }}
+                onPointerUp={(e) => {
+                  e.stopPropagation();
+
+                  if (!dragMoved) {
+                    toggleMeasurementPoint(p.id);
+                  }
+
+                  setDraggingId(null);
+
+                  setDragMoved(false);
+                }}
+                onPointerMove={(e) => {
+                  if (draggingId === p.id) {
+                    e.stopPropagation();
+
+                    setDragMoved(true);
+
+                    updateSafeZonePoint(p.id, {
+                      x: e.point.x,
+                      y: e.point.z,
+                    });
+                  }
+                }}
+              >
+                <circleGeometry args={[0.12, 20]} />
+
+                <meshBasicMaterial
+                  color={isMeasuring ? "red" : i === 0 ? "red" : "lime"}
+                  depthTest={false}
+                  depthWrite={false}
+                  polygonOffset
+                  polygonOffsetFactor={-10}
+                  polygonOffsetUnits={-10}
+                />
+              </mesh>
+            </group>
+          );
+        })}
     </>
   );
 }
