@@ -91,7 +91,7 @@ export default function PolygonMeshLayer() {
   return (
     <mesh
       rotation={[-Math.PI / 2, 0, 0]}
-      position={[offsetX, groundY, offsetZ]}
+      position={[offsetX, -2, offsetZ]}
       geometry={geometry}
     >
       <meshStandardMaterial color="green" side={THREE.DoubleSide} />
