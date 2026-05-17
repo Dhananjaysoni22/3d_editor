@@ -182,16 +182,6 @@ function Toolbar() {
       <button style={styles.button} onClick={() => toggleEditCurve()}>
         Edit Curve
       </button>
-      <button onClick={() => generateFootprint(model)}>
-        Auto Footprint {/* Screen 1+2: clean boundary + editable points */}
-      </button>
-
-      <button
-        onClick={generateSafeZone}
-        disabled={!footprintPoints.length} // only active after footprint exists
-      >
-        Generate 1500mm Offset {/* Screen 3: safety zone */}
-      </button>
     </div>
   );
 }

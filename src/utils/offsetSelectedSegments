@@ -1,0 +1,119 @@
+// utils/offsetSelectedSegments.js
+
+import * as THREE from "three";
+
+export function offsetSelectedSegments({
+    points,
+    segments,
+    selectedSegmentIds,
+    offset,
+}) {
+    const updatedPoints = [...points];
+
+    const pointMap = {};
+
+    points.forEach((p, index) => {
+        pointMap[p.id] = {
+            ...p,
+            index,
+        };
+    });
+
+    // =========================================
+    // GET CONNECTED POINT IDS
+    // =========================================
+
+    const selectedPointIds = new Set();
+
+    selectedSegmentIds.forEach((segmentId) => {
+        const seg = segments.find((s) => s.id === segmentId);
+
+        if (!seg) return;
+
+        selectedPointIds.add(seg.start);
+        selectedPointIds.add(seg.end);
+    });
+
+    // =========================================
+    // MOVE POINTS
+    // =========================================
+
+    selectedSegmentIds.forEach((segmentId) => {
+        const seg = segments.find((s) => s.id === segmentId);
+
+        if (!seg) return;
+
+        const p1 = pointMap[seg.start];
+        const p2 = pointMap[seg.end];
+
+        if (!p1 || !p2) return;
+
+        // =========================================
+        // DIRECTION
+        // =========================================
+
+        const dir = new THREE.Vector2(
+            p2.x - p1.x,
+            p2.y - p1.y,
+        ).normalize();
+
+        // =========================================
+        // NORMAL
+        // =========================================
+
+        const normal = new THREE.Vector2(
+            -dir.y,
+            dir.x,
+        );
+
+        // =========================================
+        // MOVE MAIN POINTS
+        // =========================================
+
+        [p1, p2].forEach((p) => {
+            updatedPoints[p.index] = {
+                ...updatedPoints[p.index],
+
+                x: updatedPoints[p.index].x + normal.x * offset,
+
+                y: updatedPoints[p.index].y + normal.y * offset,
+            };
+        });
+
+        // =========================================
+        // SOFT MOVE NEIGHBORS
+        // =========================================
+
+        const neighborStrength = 0.35;
+
+        const prevIndex = (p1.index - 1 + points.length) % points.length;
+
+        const nextIndex = (p2.index + 1) % points.length;
+
+        updatedPoints[prevIndex] = {
+            ...updatedPoints[prevIndex],
+
+            x:
+                updatedPoints[prevIndex].x +
+                normal.x * offset * neighborStrength,
+
+            y:
+                updatedPoints[prevIndex].y +
+                normal.y * offset * neighborStrength,
+        };
+
+        updatedPoints[nextIndex] = {
+            ...updatedPoints[nextIndex],
+
+            x:
+                updatedPoints[nextIndex].x +
+                normal.x * offset * neighborStrength,
+
+            y:
+                updatedPoints[nextIndex].y +
+                normal.y * offset * neighborStrength,
+        };
+    });
+
+    return updatedPoints;
+}

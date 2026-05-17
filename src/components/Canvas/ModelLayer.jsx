@@ -68,8 +68,8 @@ export default function ModelLayer() {
         safeZonePoints: safeZone.points,
         safeZoneSegments: safeZone.segments,
       });
+      console.log(safeZone.segments);
     }
-
     processModel();
   }, [model]);
 

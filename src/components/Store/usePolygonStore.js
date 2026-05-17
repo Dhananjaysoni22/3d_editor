@@ -21,7 +21,30 @@ export const usePolygonStore = create((set, get) => ({
     safeZoneSegments: [],     // offset segments
     showSafeZone: false,      // toggle
     outlinePoints: [],
+    selectedSegmentIds: [],
 
+    toggleSelectedSegment: (id) =>
+        set((state) => {
+            const exists =
+                state.selectedSegmentIds.includes(id);
+
+            return {
+                selectedSegmentIds: exists
+                    ? state.selectedSegmentIds.filter(
+                        (s) => s !== id
+                    )
+                    : [...state.selectedSegmentIds, id],
+            };
+        }),
+    setPoints: (points) =>
+        set(() => ({
+            points,
+        })),
+
+    setSafeZonePoints: (points) =>
+        set(() => ({
+            safeZonePoints: points,
+        })),
     updateSafeZonePoint: (id, newPos) =>
         set((state) => ({
             safeZonePoints: state.safeZonePoints.map((p) =>
