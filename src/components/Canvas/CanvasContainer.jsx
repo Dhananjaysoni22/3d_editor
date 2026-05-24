@@ -10,6 +10,7 @@ import DistanceLayer from "./DistanceLayer";
 import SafeZoneLayer from "./SafeZoneLayer";
 import OutlineLayer from "./OutlineLayer";
 import TopViewCamera from "./TopViewCamera";
+import SafeZonePolygon from "./SafeZonePolygon";
 
 export default function CanvasContainer() {
   return (
@@ -35,10 +36,13 @@ export default function CanvasContainer() {
       />
       <color attach="background" args={["#ffffff"]} />
       <ModelLayer />
-      <OutlineLayer />
-      <DistanceLayer />
+      {/* <OffsetLines /> */}
+      {/* <IntersectionPolygon /> */}
+      {/* <OutlineLayer /> */}
+      {/* <DistanceLayer /> */}
       <PointsLayer />
-      <SafeZoneLayer />
+      {/* <SafeZoneLayer /> */}
+      <SafeZonePolygon />
       <SegmentsLayer />
       <ControlPointsLayer />
       <PolygonMeshLayer />

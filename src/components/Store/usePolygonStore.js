@@ -21,7 +21,14 @@ export const usePolygonStore = create((set, get) => ({
     safeZoneSegments: [],     // offset segments
     showSafeZone: false,      // toggle
     outlinePoints: [],
+    offsetLines: [],
+    intersectionPoints: [],
+    components: [],
 
+    setIntersectionPoints: (points) =>
+        set({ intersectionPoints: points }),
+    setOffsetLines: (lines) =>
+        set({ offsetLines: lines }),
     updateSafeZonePoint: (id, newPos) =>
         set((state) => ({
             safeZonePoints: state.safeZonePoints.map((p) =>
@@ -187,7 +194,31 @@ export const usePolygonStore = create((set, get) => ({
                 s.id === id ? { ...s, ...newData } : s
             )
         })),
-    setSelectedSegment: (id) => set({ selectedSegment: id }),
+    setSelectedSegment:
+        (segment) =>
+            set({
+                selectedSegment: segment
+            }),
+
+    addComponent:
+        (component) =>
+            set((state) => ({
+                components: [
+                    ...state.components,
+                    component
+                ]
+            })),
+    removeComponent:
+        (segmentId) =>
+            set((state) => ({
+                components:
+                    state.components.filter(
+                        (c) =>
+                            !c.segmentIds.includes(
+                                segmentId
+                            )
+                    )
+            })),
     movePolygon: (dx, dy) =>
         set((state) => ({
             points: state.points.map((p) => ({
@@ -259,5 +290,6 @@ export const usePolygonStore = create((set, get) => ({
             ? state.measurementPointIds.filter((pid) => pid !== id)
             : [...state.measurementPointIds, id],
     })),
+
 
 }));

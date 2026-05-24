@@ -32,6 +32,8 @@ export function outlineToPolygon(outlinePoints) {
             start: p.id,
             end: next.id,
             type: "line",
+            safeOffset: 1.5,
+            joinType: "round"
         };
     });
 

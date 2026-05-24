@@ -4,13 +4,15 @@ import { usePolygonStore } from "../Store/usePolygonStore";
 export default function PointsLayer() {
   const {
     safeZonePoints,
+    points,
     updateSafeZonePoint,
     setSelectedSegment,
     measurementPointIds,
     toggleMeasurementPoint,
+    updatePoint,
   } = usePolygonStore();
 
-  const points = safeZonePoints;
+  // const points = points;
 
   const [draggingId, setDraggingId] = useState(null);
 
@@ -89,7 +91,7 @@ export default function PointsLayer() {
 
                     setDragMoved(true);
 
-                    updateSafeZonePoint(p.id, {
+                    updatePoint(p.id, {
                       x: e.point.x,
                       y: e.point.z,
                     });
